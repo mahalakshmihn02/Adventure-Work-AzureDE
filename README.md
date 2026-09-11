@@ -1,2 +1,2 @@
 # Adventure-Work-AzureDE
-Created for Azure Data Engineering Project using Adventure work kaagle datasets
+End-to-end Azure Data Engineering project using ADF, ADLS Gen2, Databricks, PySpark, Synapse Analytics and Power BI.
