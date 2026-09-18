@@ -194,18 +194,9 @@ Synapse/
 │
 ├── README.md
 │
-├── database_setup.sql
-│
-├── views/
-│   ├── calendar.sql
-│   ├── customer.sql
-│   ├── productcategories.sql
-│   ├── productsubcategories.sql
-│   ├── territories.sql
-│   ├── products.sql
-│   ├── returns.sql
-│   └── sales.sql
-│
+├── views
+│   └── views scripts
+│ 
 └── external_tables/
     └── external table scripts
 ```
