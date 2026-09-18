@@ -1,260 +1,257 @@
-# AdventureWorks – End-to-End Azure Data Engineering Project
+# 🏗️ AdventureWorks Azure Data Engineering – Architecture
 
-## Project Overview
+## 📌 Overview
 
-This project demonstrates an end-to-end Azure Data Engineering pipeline using the AdventureWorks dataset.
+This folder contains the architecture and overall data flow of the AdventureWorks Azure Data Engineering project.
 
-The solution implements a Medallion Architecture with Bronze, Silver and Gold layers. Data is ingested from GitHub using Azure Data Factory, transformed using Azure Databricks and PySpark, served through Azure Synapse Analytics and finally visualized using Power BI.
+The project follows a **Medallion Architecture** with three main layers:
 
-The project focuses on dynamic ingestion, parameterized pipelines, cloud storage, PySpark transformations, secure Azure authentication and SQL-based data serving.
+* 🥉 Bronze – Raw data
+* 🥈 Silver – Cleaned and transformed data
+* 🥇 Gold – Business/serving layer
 
-## Architecture
+The complete pipeline uses Azure Data Factory, Azure Data Lake Storage Gen2, Azure Databricks, PySpark, Azure Synapse Analytics and Power BI.
+
+---
+
+# 🔄 End-to-End Architecture
 
 ```text
-AdventureWorks CSV Files
-          |
-          v
-      GitHub / HTTP
-          |
-          v
-+----------------------+
-| Azure Data Factory   |
-|                      |
-| Lookup               |
-| ForEach              |
-| Parameterized Copy   |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| ADLS Gen2 - BRONZE   |
-| Raw CSV Data         |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| Azure Databricks     |
-| PySpark              |
-| Cleaning             |
-| Transformation       |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| ADLS Gen2 - SILVER   |
-| Transformed Parquet  |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| Azure Synapse        |
-| Serverless SQL       |
-| OPENROWSET           |
-| Views                |
-| External Tables      |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| GOLD / Serving Layer |
-+----------+-----------+
-           |
-           v
-       Power BI
+                    AdventureWorks Dataset
+                            |
+                            v
+                     GitHub Repository
+                            |
+                            | HTTP
+                            v
+                +-------------------------+
+                |    Azure Data Factory   |
+                |                         |
+                | Lookup                  |
+                | ForEach                 |
+                | Dynamic Copy            |
+                +------------+------------+
+                             |
+                             v
+                +-------------------------+
+                |     ADLS Gen2           |
+                |      BRONZE             |
+                |                         |
+                |      Raw CSV Files      |
+                +------------+------------+
+                             |
+                             v
+                +-------------------------+
+                |    Azure Databricks     |
+                |                         |
+                |       PySpark           |
+                |                         |
+                | Cleaning                |
+                | Null Handling           |
+                | Duplicate Handling      |
+                | Transformations         |
+                +------------+------------+
+                             |
+                             v
+                +-------------------------+
+                |     ADLS Gen2           |
+                |       SILVER            |
+                |                         |
+                |   Transformed Parquet   |
+                +------------+------------+
+                             |
+                             v
+                +-------------------------+
+                |   Azure Synapse         |
+                |   Serverless SQL        |
+                |                         |
+                |   OPENROWSET            |
+                |   Views                 |
+                |   External Tables       |
+                +------------+------------+
+                             |
+                             v
+                +-------------------------+
+                |      GOLD / SERVING     |
+                +------------+------------+
+                             |
+                             v
+                         Power BI
+                             |
+                             v
+                         Dashboard
 ```
 
-## Technologies Used
+---
 
-* Azure Data Factory
-* Azure Data Lake Storage Gen2
-* Azure Databricks
-* PySpark
-* Azure Synapse Analytics
-* Serverless SQL
+# 🥉 Bronze Layer
+
+The Bronze layer contains the raw data ingested from GitHub.
+
+### Source
+
+```text
+GitHub
+```
+
+### Ingestion Tool
+
+```text
+Azure Data Factory
+```
+
+### Storage
+
+```text
+Azure Data Lake Storage Gen2
+```
+
+### Data Format
+
+```text
+CSV
+```
+
+The objective of the Bronze layer is to preserve the source data in its raw form before transformation.
+
+---
+
+# 🥈 Silver Layer
+
+The Silver layer contains cleaned and transformed data.
+
+Azure Databricks is used to process the Bronze data.
+
+### Technology
+
+```text
+Azure Databricks
+PySpark
+```
+
+### Main Activities
+
+* Read CSV files
+* Check schema
+* Handle data types
+* Check null values
+* Check duplicate records
+* Remove duplicates where required
+* Perform data cleansing
+* Create transformed DataFrames
+* Write the output in Parquet format
+
+---
+
+# 🥇 Gold / Serving Layer
+
+Azure Synapse Analytics is used as the serving layer.
+
+The Silver Parquet files are queried using **Serverless SQL**.
+
+The project creates views under the `gold` schema.
+
+Examples:
+
+```text
+gold.calendar
+gold.customer
+gold.productcategories
+gold.productsubcategories
+gold.territories
+gold.products
+gold.returns
+gold.sales
+```
+
+These objects provide a structured layer for analytical consumption.
+
+---
+
+# 📊 Power BI Layer
+
+Power BI is connected to the Synapse serving layer.
+
+The purpose of this layer is to provide business-friendly visualizations.
+
+The dashboard can be used to analyze:
+
+* Sales
+* Products
+* Customers
+* Territories
+* Returns
+* Business KPIs
+
+---
+
+# 🔐 Security Architecture
+
+Azure identity-based authentication is used where applicable.
+
+The project uses concepts such as:
+
 * Microsoft Entra ID
 * Managed Identity
-* RBAC
-* Parquet
-* SQL
-* Power BI
-* GitHub
+* Azure RBAC
+* Storage access roles
 
-## Dataset
+Secrets and passwords are not stored in the GitHub repository.
 
-The project uses the AdventureWorks dataset containing information related to:
+---
 
-* Calendar
-* Customers
-* Products
-* Product Categories
-* Product Subcategories
-* Sales
-* Returns
-* Territories
-
-The source CSV files are available in the `data` section of this repository.
-
-## Bronze Layer – Data Ingestion
-
-Azure Data Factory is used as the orchestration layer.
-
-A metadata-driven JSON configuration is used to define:
-
-* Source relative URL
-* Destination folder
-* Destination file name
-
-ADF uses:
-
-1. Lookup Activity
-2. ForEach Activity
-3. Parameterized Copy Activity
-
-The Lookup activity reads the metadata configuration and passes the resulting array to the ForEach activity.
-
-The Copy Activity dynamically retrieves the source files and stores them in the Bronze container of ADLS Gen2.
-
-### Key concepts demonstrated
-
-* Dynamic pipelines
-* Parameterized datasets
-* Lookup Activity
-* ForEach Activity
-* Copy Activity
-* Metadata-driven ingestion
-* REST/HTTP-based source ingestion
-
-## Silver Layer – Data Transformation
-
-Azure Databricks is used for transformation.
-
-PySpark reads the raw data from the Bronze layer and performs data preparation and transformation before writing the results to the Silver layer in Parquet format.
-
-Typical transformation activities include:
-
-* Reading CSV data
-* Schema/data type handling
-* Null handling
-* Duplicate handling
-* Column transformations
-* Data cleansing
-* Writing transformed data as Parquet
-
-## Security and Authentication
-
-The project uses Azure identity-based access for communication between Azure services.
-
-Microsoft Entra ID App Registration is used for external application authentication where required.
-
-Azure RBAC is configured using appropriate roles such as Storage Blob Data Contributor.
-
-Azure Managed Identity is used for Azure service-to-service access where applicable.
-
-No credentials or secrets are stored in this repository.
-
-## Gold Layer – Azure Synapse Analytics
-
-Azure Synapse Analytics Serverless SQL is used as the serving/query layer.
-
-The Silver Parquet files are queried using `OPENROWSET`.
-
-Example:
-
-```sql
-SELECT *
-FROM OPENROWSET(
-    BULK 'https://<storage-account>.blob.core.windows.net/silver/<folder>/',
-    FORMAT = 'PARQUET'
-) AS Query1;
-```
-
-A Gold schema is created and views are defined for the business entities.
-
-Views include:
-
-* `gold.calendar`
-* `gold.customer`
-* `gold.productcategories`
-* `gold.productsubcategories`
-* `gold.territories`
-* `gold.products`
-* `gold.returns`
-* `gold.sales`
-
-External data sources and external file formats are then configured, followed by external tables for serving the curated data.
-
-## Power BI
-
-Power BI is connected to the Synapse serving layer to create analytical dashboards.
-
-The dashboard contains visualizations such as:
-
-* Sales trends
-* Product performance
-* Customer analysis
-* Territory analysis
-* Return analysis
-* KPI cards
-* Bar charts
-* Line charts
-
-## Key Data Engineering Concepts Demonstrated
-
-### Data Ingestion
-
-GitHub → Azure Data Factory → ADLS Bronze
-
-### Data Transformation
-
-ADLS Bronze → Databricks/PySpark → ADLS Silver
-
-### Data Serving
-
-ADLS Silver → Synapse Serverless SQL → Gold
-
-### Analytics
-
-Synapse → Power BI
-
-## Repository Structure
+# 🔁 Complete Data Flow
 
 ```text
-adf/
-    pipelines/
-    datasets/
-    linked-services/
-
-databricks/
-    bronze_to_silver.py
-
-synapse/
-    views/
-    external_tables/
-    database_setup.sql
-
-powerbi/
-    dashboard.png
-
-architecture/
-    architecture.png
-
-screenshots/
-    adf_pipeline.png
-    databricks_notebook.png
-    synapse.png
-    powerbi_dashboard.png
-
-docs/
-    project_flow.md
-    data_dictionary.md
+GitHub
+   ↓
+Azure Data Factory
+   ↓
+ADLS Gen2 - Bronze
+   ↓
+Azure Databricks
+   ↓
+PySpark Transformation
+   ↓
+ADLS Gen2 - Silver
+   ↓
+Azure Synapse Serverless SQL
+   ↓
+Gold Views / External Tables
+   ↓
+Power BI
 ```
 
-## Learning Outcome
+---
 
-Through this project, I gained hands-on experience in designing and implementing an end-to-end Azure Data Engineering pipeline involving data ingestion, cloud storage, transformation, data serving, security and visualization.
+# 🎯 Architecture Objectives
 
-The project helped me understand how different Azure services work together in a modern data platform.
+The architecture was designed to:
 
-## Disclaimer
+1. Separate raw and transformed data.
+2. Make ingestion reusable.
+3. Perform transformations using PySpark.
+4. Store transformed data in an efficient columnar format.
+5. Provide a SQL-based serving layer.
+6. Enable Power BI reporting.
 
-This project was implemented as a hands-on learning project based on publicly available learning material. The implementation, documentation and repository organization are maintained for educational and portfolio purposes.
+---
+
+# 🛠️ Azure Services Used
+
+| Service                 | Purpose                          |
+| ----------------------- | -------------------------------- |
+| Azure Data Factory      | Data ingestion and orchestration |
+| ADLS Gen2               | Data lake storage                |
+| Azure Databricks        | Data transformation              |
+| PySpark                 | Data processing                  |
+| Azure Synapse Analytics | SQL serving layer                |
+| Power BI                | Visualization                    |
+| Microsoft Entra ID      | Authentication                   |
+| Azure RBAC              | Authorization                    |
+
+---
+
+# 🎤 Interview Explanation
+
+> "I designed the project using a Medallion Architecture. AdventureWorks CSV files are ingested from GitHub into the Bronze layer of ADLS Gen2 using Azure Data Factory. Azure Databricks reads the Bronze data and performs cleaning and transformation using PySpark, and the processed data is stored in Parquet format in the Silver layer. Azure Synapse Serverless SQL is then used to query the Silver data and create Gold views and external tables. Finally, Power BI consumes the serving layer for reporting and visualization."
