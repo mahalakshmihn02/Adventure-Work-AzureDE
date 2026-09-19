@@ -1,30 +1,72 @@
-# Azure Data Factory
+# 🔥 Azure Data Factory – AdventureWorks Data Ingestion
 
-Azure Data Factory (ADF) is used for **data ingestion and orchestration** in this project.
+## 📌 Overview
 
-## Pipeline
+Azure Data Factory (ADF) is used in this project for **data ingestion and pipeline orchestration**.
 
-**Pipeline:** `DynamicIngestion_to_bronzecontainer`
-
-### Pipeline Flow
+The pipeline uses a **metadata-driven approach** to dynamically read multiple AdventureWorks CSV files from GitHub and load them into the Bronze layer of ADLS Gen2.
 
 ```text
+GitHub Repository
+       |
+       v
 JSON Metadata
-     ↓
- Lookupgit
-     ↓
- ForEachGit
-     ↓
- DynamicCopy
-     ↓
-GitHub / HTTP
-     ↓
-ADLS Gen2 Bronze
+       |
+       v
+Azure Data Factory
+       |
+       v
+Lookup Activity
+       |
+       v
+ForEach Activity
+       |
+       v
+Dynamic Copy Activity
+       |
+       v
+ADLS Bronze
 ```
 
-## Metadata-Driven Ingestion
+---
 
-The pipeline uses the metadata file:
+# 🎯 Objective
+
+The main objectives of the ADF ingestion layer are:
+
+* Read AdventureWorks dataset information from metadata
+* Dynamically process multiple CSV files
+* Read files from GitHub using HTTP
+* Use Lookup activity to read metadata
+* Use ForEach activity to process multiple files
+* Use dynamic parameters for source and destination paths
+* Load raw data into ADLS Gen2 Bronze
+* Create a reusable ingestion pipeline
+
+---
+
+# 🗂️ Source Data
+
+The source AdventureWorks CSV files are stored in a GitHub repository.
+
+The project works with the following datasets:
+
+```text
+Calendar
+Customers
+Product Categories
+Product Subcategories
+Products
+Returns
+Sales
+Territories
+```
+
+---
+
+# 📄 Metadata File
+
+The pipeline uses a JSON metadata file:
 
 ```text
 parameters/adventure_work_git.json
@@ -38,63 +80,6 @@ The metadata contains:
 | `p_folder`  | Bronze destination folder |
 | `p_file`    | Destination file name     |
 
-This allows the same pipeline to process multiple files without creating separate Copy Activities.
-
-## Lookup Activity
-
-**Activity:** `Lookupgit`
-
-* Dataset: `ds_gitjson`
-* Linked Service: `ls_storageaccount`
-* Reads all records from the metadata JSON.
-* Output is passed to the ForEach activity.
-
-## ForEach Activity
-
-**Activity:** `ForEachGit`
-
-Uses:
-
-```adf
-@activity('Lookupgit').output.value
-```
-
-Sequential processing is enabled, so metadata records are processed one at a time.
-
-## Dynamic Copy Activity
-
-**Activity:** `DynamicCopy`
-
-### Source
-
-* Dataset: `ds_dynamic_http_git`
-* Linked Service: `ls_http_git`
-* Base URL: `https://raw.githubusercontent.com/`
-* Dynamic parameter:
-
-```adf
-@item().p_rel_url
-```
-
-### Sink
-
-* Dataset: `ds_dynamic_bronze`
-* Linked Service: `ls_storageaccount`
-
-Destination:
-
-```text
-bronze/@dataset().p_folder/@dataset().p_file
-```
-
-## Parameter Flow
-
-```text
-p_rel_url  → Source URL
-p_folder   → Bronze Folder
-p_file     → Destination File
-```
-
 Example:
 
 ```text
@@ -103,105 +88,274 @@ p_folder  = AdventureWorks_Sales
 p_file    = AdventureWorks_Sales.csv
 ```
 
-Output:
+The metadata allows the same pipeline to process multiple files without creating separate Copy Activities.
+
+---
+
+# 🔍 Lookup Activity
+
+The first activity in the pipeline is:
+
+```text
+Lookupgit
+```
+
+The Lookup activity reads the metadata JSON file.
+
+Configuration:
+
+* Dataset: `ds_gitjson`
+* Linked Service: `ls_storageaccount`
+* Reads metadata records
+* Passes the output to the ForEach activity
+
+```text
+Metadata JSON
+      |
+      v
+  Lookupgit
+      |
+      v
+Metadata Records
+```
+
+---
+
+# 🔁 ForEach Activity
+
+The next activity is:
+
+```text
+ForEachGit
+```
+
+The ForEach activity processes each metadata record.
+
+Items expression:
+
+```adf
+@activity('Lookupgit').output.value
+```
+
+Sequential processing is enabled, so the metadata records are processed one at a time.
+
+```text
+Lookup Output
+     |
+     v
+ForEachGit
+     |
+     +---- File 1
+     |
+     +---- File 2
+     |
+     +---- File 3
+     |
+     +---- ...
+```
+
+---
+
+# 📥 Dynamic Copy Activity
+
+Inside the ForEach activity, the following Copy Activity is used:
+
+```text
+DynamicCopy
+```
+
+It dynamically reads the source file and writes it to the required Bronze folder.
+
+## Source
+
+Configuration:
+
+* Dataset: `ds_dynamic_http_git`
+* Linked Service: `ls_http_git`
+* Base URL:
+
+```text
+https://raw.githubusercontent.com/
+```
+
+Dynamic source parameter:
+
+```adf
+@item().p_rel_url
+```
+
+The source file path changes dynamically for every metadata record.
+
+---
+
+# 📤 Sink
+
+The destination uses:
+
+* Dataset: `ds_dynamic_bronze`
+* Linked Service: `ls_storageaccount`
+
+The destination path is:
+
+```text
+bronze/@dataset().p_folder/@dataset().p_file
+```
+
+For example:
 
 ```text
 bronze/AdventureWorks_Sales/AdventureWorks_Sales.csv
 ```
 
-# End-to-End Architecture
+---
+
+# 🔄 Parameter Flow
+
+The metadata parameters are used dynamically throughout the pipeline.
 
 ```text
-                  GitHub Repository
-                         |
-                         | HTTP
-                         v
-               ┌────────────────────┐
-               │   Source Dataset   │
-               │ ds_dynamic_http_git│
-               └──────────┬─────────┘
-                          |
-                          v
-                 Azure Data Factory
-                          |
-               ┌──────────┴─────────┐
-               │      Lookupgit      │
-               │    Read Metadata    │
-               └──────────┬─────────┘
-                          |
-                          v
-               ┌────────────────────┐
-               │     ForEachGit      │
-               │   Sequential Loop   │
-               └──────────┬─────────┘
-                          |
-                          v
-               ┌────────────────────┐
-               │     DynamicCopy     │
-               │  Dynamic Parameters │
-               └──────────┬─────────┘
-                          |
-                          v
-               ┌────────────────────┐
-               │      ADLS Gen2      │
-               │    Bronze Layer     │
-               └────────────────────┘
+p_rel_url
+    |
+    v
+Source GitHub File
+
+p_folder
+    |
+    v
+Bronze Folder
+
+p_file
+    |
+    v
+Destination File
+```
+
+This makes the pipeline reusable for multiple datasets.
+
+---
+
+# 🏗️ Pipeline Flow
+
+The complete pipeline flow is:
+
+```text
+GitHub
+   |
+   v
+JSON Metadata
+   |
+   v
+Lookupgit
+   |
+   v
+ForEachGit
+   |
+   v
+DynamicCopy
+   |
+   v
+ADLS Gen2 Bronze
 ```
 
 ---
 
-# Project Structure
+# 📦 Bronze Layer
+
+The raw CSV files are stored in the Bronze layer of ADLS Gen2.
+
+Example:
+
+```text
+bronze/
+│
+├── AdventureWorks_Calendar/
+├── AdventureWorks_Customers/
+├── AdventureWorks_Product_Categories/
+├── AdventureWorks_Product_Subcategories/
+├── AdventureWorks_Products/
+├── AdventureWorks_Returns/
+├── AdventureWorks_Sales/
+└── AdventureWorks_Territories/
+```
+
+The Bronze layer contains the raw ingested data before transformation.
+
+---
+
+# 🔄 Metadata-Driven Ingestion
+
+The pipeline is metadata-driven because the source file, destination folder, and destination file name are provided through the JSON metadata.
+
+```text
+Metadata
+   |
+   +---- Source Path
+   |
+   +---- Destination Folder
+   |
+   +---- Destination File
+   |
+   v
+Reusable Pipeline
+```
+
+This avoids creating separate pipelines or Copy Activities for each dataset.
+
+---
+
+# 🗂️ Project Structure
 
 ```text
 ADF/
 │
-├── parameters/
-│   └── adventure_work_git.json
-│
-├── datasets/
+├── dataset/
 │   ├── ds_gitjson
 │   ├── ds_dynamic_http_git
 │   └── ds_dynamic_bronze
 │
-├── linkedServices/
+├── linkedService/
 │   ├── ls_storageaccount
 │   └── ls_http_git
 │
-└── pipelines/
+└── pipeline/
     └── DynamicIngestion_to_bronzecontainer
 ```
 
 ---
 
-# Key Concepts:
+# 🧪 Pipeline Components
+
+| Component           | Purpose                    |
+| ------------------- | -------------------------- |
+| Lookupgit           | Reads metadata             |
+| ForEachGit          | Processes metadata records |
+| DynamicCopy         | Copies files dynamically   |
+| ds_gitjson          | Metadata dataset           |
+| ds_dynamic_http_git | GitHub source dataset      |
+| ds_dynamic_bronze   | Bronze sink dataset        |
+| ls_http_git         | HTTP connection            |
+| ls_storageaccount   | ADLS Gen2 connection       |
+
+---
+
+# 🎯 Key Concepts
 
 * **Azure Data Factory**
 * **Metadata-driven ingestion**
-* **Dynamic pipeline design**
 * **Lookup Activity**
 * **ForEach Activity**
 * **Copy Activity**
 * **Dataset parameters**
-* **Pipeline expressions**
+* **Dynamic expressions**
 * **Dynamic source path**
 * **Dynamic sink path**
-* **Azure Data Lake Storage Gen2**
-* **HTTP/GitHub data ingestion**
-* **Sequential processing**
-* **Reusable pipeline architecture**
+* **HTTP/GitHub ingestion**
+* **ADLS Gen2**
+* **Bronze layer**
+* **Pipeline orchestration**
 
 ---
 
-# Summary
+# 🎤 Interview Explanation
 
-The `DynamicIngestion_to_bronzecontainer` pipeline implements a **metadata-driven data ingestion framework using Azure Data Factory**.
-
-The pipeline reads file configuration from:
-
-```text
-parameters/adventure_work_git.json
-```
-
-The **Lookup** activity retrieves the metadata records, the **ForEach** activity processes each record sequentially, and the **DynamicCopy** activity dynamically retrieves files from GitHub and loads them into the **Bronze layer of ADLS Gen2**.
-
-This provides a **dynamic, reusable, scalable, and maintainable solution** for processing multiple AdventureWorks datasets.
+> "I used Azure Data Factory for the data ingestion layer of my AdventureWorks project. I created a metadata-driven pipeline called `DynamicIngestion_to_bronzecontainer`. The pipeline first reads the JSON metadata using a Lookup activity. The metadata output is passed to a ForEach activity, which processes each record sequentially. Inside the ForEach, a dynamic Copy Activity reads the CSV files from GitHub using HTTP and loads them into the Bronze layer of ADLS Gen2. I used dynamic parameters for the source URL, destination folder and file name, which makes the pipeline reusable for multiple datasets."
