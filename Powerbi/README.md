@@ -35,8 +35,6 @@ The report can be used to analyze:
 * Sales
 * Products
 * Customers
-* Territories
-* Returns
 * Business KPIs
 
 ---
